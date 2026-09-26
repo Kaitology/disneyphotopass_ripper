@@ -1,40 +1,65 @@
-let ongoingDownloads = 0;
+const GRAPHIC_BASE =
+    'https://www.disneyphotopass.eu/Imaging/GetGraphic.ashx?flex=true&obqs1=';
+const DOWNLOAD_PARAMS = '&region=en-GB&maxdim=6000';
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === "downloadImages") {
-        const baseURL = "https://www.disneyphotopass.eu/Imaging/GetGraphic.ashx?flex=true&key=";
-        const params = "&region=en-GB&maxdim=6000";
+function buildDownloadUrl(obqsToken) {
+    return GRAPHIC_BASE + encodeURIComponent(obqsToken) + DOWNLOAD_PARAMS;
+}
 
-        ongoingDownloads = message.pictureKeys.length;
+/** @deprecated Legacy PictureKey URLs */
+function buildLegacyDownloadUrl(pictureKey) {
+    return (
+        'https://www.disneyphotopass.eu/Imaging/GetGraphic.ashx?flex=true&key=' +
+        encodeURIComponent(pictureKey) +
+        DOWNLOAD_PARAMS
+    );
+}
 
-        message.pictureKeys.forEach(key => {
-            let url = baseURL + key + params;
-            downloadImage(url, () => {
-                ongoingDownloads--;
-                if (ongoingDownloads <= 0) {
-                    sendResponse({ status: "Downloaded all images." });
+function downloadImage(url) {
+    return new Promise((resolve) => {
+        chrome.downloads.download({ url, conflictAction: 'uniquify' }, (downloadId) => {
+            if (chrome.runtime.lastError || downloadId === undefined) {
+                console.error('EXTRACTOR:', chrome.runtime.lastError);
+                resolve();
+                return;
+            }
+
+            const onChanged = (delta) => {
+                if (delta.id !== downloadId || !delta.state) return;
+                const state = delta.state.current;
+                if (state === 'complete' || state === 'interrupted') {
+                    chrome.downloads.onChanged.removeListener(onChanged);
+                    resolve();
                 }
-            });
+            };
+            chrome.downloads.onChanged.addListener(onChanged);
         });
-
-        // Indicate that we will send a response asynchronously
-        return true;
-    }
-});
-
-let downloadImage = (url, callback) => {
-    chrome.downloads.download({ url: url }, (downloadId) => {
-        if (chrome.runtime.lastError) {
-            console.error(chrome.runtime.lastError);
-            callback();
-        } else {
-            // Use onDownloadComplete listener to know when the download is finished
-            chrome.downloads.onChanged.addListener(function onDownloadChanged(downloadDelta) {
-                if (downloadDelta.id === downloadId && (downloadDelta.state && downloadDelta.state.current === "complete")) {
-                    chrome.downloads.onChanged.removeListener(onDownloadChanged);
-                    callback();
-                }
-            });
-        }
     });
-};
+}
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message.action !== 'downloadImages') {
+        return false;
+    }
+
+    const obqsTokens = message.obqsTokens || [];
+    const legacyKeys = message.pictureKeys || [];
+    const urls = [
+        ...obqsTokens.map(buildDownloadUrl),
+        ...legacyKeys.map(buildLegacyDownloadUrl),
+    ];
+
+    if (urls.length === 0) {
+        sendResponse({ status: 'No images to download.' });
+        return false;
+    }
+
+    (async () => {
+        for (const url of urls) {
+            await downloadImage(url);
+        }
+        sendResponse({ status: `Downloaded ${urls.length} image(s).` });
+    })();
+
+    return true;
+});

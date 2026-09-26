@@ -1,8 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Disney Photo Pass Downloader",
-  "version": "1.0",
-  "description": "Automatically download files from disneyphotopass.eu if the URL contains the obqs1 parameter.",
+  "version": "1.1.0",
+  "description": "Download full-resolution Disney PhotoPass images (obqs1) from disneyphotopass.eu.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -11,31 +16,30 @@
       "128": "icons/icon128.png"
     }
   },
-  "permissions": [
-    "webRequest",
-    "scripting",
-    "downloads"
-  ],
-"background": {
+  "permissions": ["downloads"],
+  "background": {
     "service_worker": "background.js"
   },
-	"web_accessible_resources": [
-		{
-		  "resources": ["pageScript.js"],
-		  "matches": ["https://www.disneyphotopass.eu/*", "https://disneyphotopass.eu/*"]
-		}
-	],
-
+  "web_accessible_resources": [
+    {
+      "resources": ["pageScript.js"],
+      "matches": [
+        "https://www.disneyphotopass.eu/*",
+        "https://disneyphotopass.eu/*"
+      ]
+    }
+  ],
   "content_scripts": [
     {
-	"matches": [
-    "https://disneyphotopass.eu/*",
-    "https://www.disneyphotopass.eu/*"
-	],
-    "js": ["content.js"]
+      "matches": [
+        "https://disneyphotopass.eu/*",
+        "https://www.disneyphotopass.eu/*"
+      ],
+      "js": ["content.js"]
     }
   ],
   "host_permissions": [
-    "<all_urls>"
+    "https://www.disneyphotopass.eu/*",
+    "https://disneyphotopass.eu/*"
   ]
 }
