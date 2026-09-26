@@ -1,6 +1,6 @@
 # Disney PhotoPass Ripper
 
-Chrome extension to download **full-resolution** photos from [disneyphotopass.eu](https://www.disneyphotopass.eu) (Disneyland Paris PhotoPass). It uses the site’s `GetGraphic.ashx` “flex” URLs so you get large JPEGs, not only small thumbnails.
+Chrome extension to download photos from [disneyphotopass.eu](https://www.disneyphotopass.eu) (Disneyland Paris PhotoPass): **with frame**, **photo only** (full-resolution via `PictureKey`), or **frame only** (template asset).
 
 You must be **logged in** in Chrome. Downloads use your normal browser session.
 
@@ -80,40 +80,36 @@ The extension icon should stay visible on the toolbar.
 ### 1. Sign in
 
 1. In Chrome, go to [https://www.disneyphotopass.eu](https://www.disneyphotopass.eu).
-2. Sign in to your account (email and password).
+2. Sign in (email/password or PhotoPass ID on the site).
 
 ### 2. Open your photo gallery
 
-1. Go to your **Photos** / **Photo collection** page (URL usually contains `/Photos`).
-2. Wait until **thumbnails** appear on the page.  
-   If you see only empty space, wait a few seconds or refresh once.
+1. Go to **Photos** (URL usually contains `/Photos`).
+2. Wait until **thumbnails** appear.
 
-### 3. Load more photos by scrolling
+### 3. Scroll to load photos
 
-The extension only downloads photos that are **already loaded in the page** (visible in the HTML).
+The extension reads photos that are **loaded on the page**.
 
-1. **Scroll down** through your gallery slowly.
-2. Pause when new date groups or new thumbnails appear.
-3. Repeat until you have scrolled through **all dates** you care about.
+1. **Scroll down** through the gallery until you see every date you want.
+2. Open the extension popup and tap **↻** (refresh) if you scrolled after opening it.
 
-If you skip scrolling, you will only get photos from the part of the gallery that was loaded at the top.
+### 4. Choose what to download
 
-### 4. Click the extension button
+In the popup:
 
-1. Click the **Disney Photo Pass Downloader** icon in the toolbar.
-2. In the small popup, click **Download visible photos**.
-3. Wait for the green success message (or a red error with a hint).
+1. **Include** — pick one or more:
+   - **With frame** — composite JPEG from `GetImage.ashx` (`UrlParamsL` when available).
+   - **Photo only** — full-resolution JPEG from `GetGraphic.ashx` with your `PictureKey` and `flex=true` (`maxdim=6000`).
+   - **Frame only** — template frame PNG from `GetTemplateAsset.ashx` (resolved via the site designer API while you stay logged in).
+2. **Tap photos** in the grid to select or deselect ( **All** / **None** shortcuts at the top).
+3. Click **Download selected**.
 
-Chrome will start one download per photo. Check the **Downloads** bar at the bottom of Chrome or your system **Downloads** folder.
+Chrome saves files to your **Downloads** folder. Each photo × each checked type = one file.
 
-### 5. Repeat for more batches (optional)
+### 5. More photos later
 
-If you scroll further and load **new** thumbnails that were not on the page before:
-
-1. Scroll to load them.
-2. Click **Download visible photos** again.
-
-Already-downloaded files may get a new name (`(1)`, `(2)`, etc.) because Chrome avoids overwriting.
+Scroll to load more thumbnails → **↻** in the popup → select → download again.
 
 ---
 
@@ -126,7 +122,8 @@ Already-downloaded files may get a new name (`(1)`, `(2)`, etc.) because Chrome 
 | Login | disneyphotopass.eu → sign in |
 | Gallery | Open **Photos** → wait for thumbnails |
 | Scroll | Scroll through **all** dates you want |
-| Download | Extension popup → **Download visible photos** |
+| Refresh | Extension popup → **↻** |
+| Download | Choose types → select photos → **Download selected** |
 
 ---
 
@@ -153,6 +150,6 @@ Already-downloaded files may get a new name (`(1)`, `(2)`, etc.) because Chrome 
 ## For developers
 
 - **Manifest:** Chrome MV3 (`manifest.json`)
-- **Flow:** Popup → content script → page script collects `obqs1` tokens → background service worker builds `GetGraphic.ashx?flex=true&obqs1=...&region=en-GB&maxdim=6000` URLs → `chrome.downloads`
+- **Flow:** Popup lists `PictureKey`, `UrlParams`, and `UrlParamsL` from `View.Data.P` (or DOM) → user selects types + photos → background builds the correct imaging URL per type → `chrome.downloads`
 
 After you change code, reload the extension on `chrome://extensions` and refresh the PhotoPass tab.

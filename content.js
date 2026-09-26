@@ -1,69 +1,128 @@
-const EXTRACT_EVENT = 'PhotoPassObqsExtracted';
-const EXTRACT_TIMEOUT_MS = 15000;
+const LIST_EVENT = 'PhotoPassPhotosListed';
+const OVERLAY_EVENT = 'PhotoPassOverlayResolved';
+const LIST_TIMEOUT_MS = 15000;
+const OVERLAY_TIMEOUT_MS = 120000;
 
-let extractInFlight = false;
+let listInFlight = false;
+let overlayInFlight = false;
+
+function injectPageScript() {
+    return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            document.removeEventListener(LIST_EVENT, onListed);
+            reject(new Error('Timed out while reading photos from the page.'));
+        }, LIST_TIMEOUT_MS);
+
+        const onListed = (event) => {
+            clearTimeout(timeoutId);
+            document.removeEventListener(LIST_EVENT, onListed);
+            const payload = event.detail;
+            if (Array.isArray(payload)) {
+                resolve({ photos: payload, source: 'legacy' });
+                return;
+            }
+            resolve({
+                photos: Array.isArray(payload?.photos) ? payload.photos : [],
+                source: payload?.source || 'unknown',
+            });
+        };
+
+        document.addEventListener(LIST_EVENT, onListed);
+
+        const script = document.createElement('script');
+        script.src = chrome.runtime.getURL('pageScript.js');
+        script.onload = () => script.remove();
+        script.onerror = () => {
+            clearTimeout(timeoutId);
+            document.removeEventListener(LIST_EVENT, onListed);
+            reject(new Error('Could not load page script.'));
+        };
+        (document.head || document.documentElement).appendChild(script);
+    });
+}
+
+function injectOverlayResolver(pictureKeys) {
+    return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            document.removeEventListener(OVERLAY_EVENT, onResolved);
+            reject(new Error('Timed out while resolving frame assets.'));
+        }, OVERLAY_TIMEOUT_MS);
+
+        const onResolved = (event) => {
+            clearTimeout(timeoutId);
+            document.removeEventListener(OVERLAY_EVENT, onResolved);
+            resolve(event.detail?.urls || {});
+        };
+
+        document.addEventListener(OVERLAY_EVENT, onResolved);
+
+        const script = document.createElement('script');
+        script.src = chrome.runtime.getURL('resolveOverlayScript.js');
+        script.dataset.keys = JSON.stringify(pictureKeys);
+        script.onload = () => script.remove();
+        script.onerror = () => {
+            clearTimeout(timeoutId);
+            document.removeEventListener(OVERLAY_EVENT, onResolved);
+            reject(new Error('Could not load overlay resolver.'));
+        };
+        (document.head || document.documentElement).appendChild(script);
+    });
+}
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message.action !== 'extractPictureKeys') {
-        return false;
-    }
-
-    if (extractInFlight) {
-        sendResponse({ status: 'error', message: 'A download is already in progress.' });
-        return false;
-    }
-
-    extractInFlight = true;
-    let finished = false;
-
-    const finish = (payload) => {
-        if (finished) return;
-        finished = true;
-        extractInFlight = false;
-        sendResponse(payload);
-    };
-
-    const onExtracted = (event) => {
-        document.removeEventListener(EXTRACT_EVENT, onExtracted);
-        clearTimeout(timeoutId);
-
-        const obqsTokens = Array.isArray(event.detail) ? event.detail : [];
-        if (obqsTokens.length === 0) {
-            finish({
-                status: 'error',
-                message:
-                    'No photos found. Open your PhotoPass gallery and wait until thumbnails appear, then try again.',
-            });
-            return;
+    if (message.action === 'listPhotos') {
+        if (listInFlight) {
+            sendResponse({ status: 'error', message: 'Already loading photos. Wait a moment.' });
+            return false;
         }
 
-        chrome.runtime.sendMessage(
-            { action: 'downloadImages', obqsTokens },
-            (response) => {
-                if (chrome.runtime.lastError) {
-                    finish({ status: 'error', message: chrome.runtime.lastError.message });
+        listInFlight = true;
+        injectPageScript()
+            .then(({ photos, source }) => {
+                listInFlight = false;
+                if (!photos.length) {
+                    sendResponse({
+                        status: 'error',
+                        message:
+                            'No photos found. Open your gallery, scroll until thumbnails load, then tap Refresh.',
+                    });
                     return;
                 }
-                finish({
-                    status: 'success',
-                    message: response?.status || `Started ${obqsTokens.length} download(s).`,
-                    count: obqsTokens.length,
-                });
-            }
-        );
-    };
+                sendResponse({ status: 'success', photos, source });
+            })
+            .catch((err) => {
+                listInFlight = false;
+                sendResponse({ status: 'error', message: err.message });
+            });
 
-    const timeoutId = setTimeout(() => {
-        document.removeEventListener(EXTRACT_EVENT, onExtracted);
-        finish({ status: 'error', message: 'Timed out while reading photos from the page.' });
-    }, EXTRACT_TIMEOUT_MS);
+        return true;
+    }
 
-    document.addEventListener(EXTRACT_EVENT, onExtracted);
+    if (message.action === 'resolveOverlay') {
+        const keys = Array.isArray(message.pictureKeys) ? message.pictureKeys : [];
+        if (!keys.length) {
+            sendResponse({ urls: {} });
+            return false;
+        }
 
-    const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('pageScript.js');
-    script.onload = () => script.remove();
-    (document.head || document.documentElement).appendChild(script);
+        if (overlayInFlight) {
+            sendResponse({ urls: {}, error: 'Overlay resolve already in progress.' });
+            return false;
+        }
 
-    return true;
+        overlayInFlight = true;
+        injectOverlayResolver(keys)
+            .then((urls) => {
+                overlayInFlight = false;
+                sendResponse({ urls });
+            })
+            .catch((err) => {
+                overlayInFlight = false;
+                sendResponse({ urls: {}, error: err.message });
+            });
+
+        return true;
+    }
+
+    return false;
 });

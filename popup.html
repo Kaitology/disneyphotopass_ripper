@@ -1,35 +1,53 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Disney Photo Pass Downloader</title>
-    <style>
-        body {
-            width: 260px;
-            font-family: system-ui, sans-serif;
-            font-size: 13px;
-            margin: 12px;
-        }
-        button {
-            width: 100%;
-            padding: 8px;
-            cursor: pointer;
-        }
-        #status {
-            margin-top: 10px;
-            line-height: 1.35;
-        }
-        #status.error {
-            color: #b00020;
-        }
-        #status.success {
-            color: #0d6b0d;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PhotoPass</title>
+    <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-    <button id="extractBtn" type="button">Download visible photos</button>
-    <p id="status">Open your PhotoPass gallery first, then click the button.</p>
-    <script src="popup.js"></script>
+    <header class="top">
+        <div class="brand">
+            <span class="brand-title">PhotoPass</span>
+            <span class="brand-sub" id="photoCount">—</span>
+        </div>
+        <button type="button" class="icon-btn" id="refreshBtn" title="Refresh from page">↻</button>
+    </header>
+
+    <section class="formats" aria-label="Download types">
+        <p class="section-label">Include</p>
+        <div class="chips">
+            <label class="chip">
+                <input type="checkbox" name="format" value="composite" checked>
+                <span>With frame</span>
+            </label>
+            <label class="chip">
+                <input type="checkbox" name="format" value="photo" checked>
+                <span>Photo only</span>
+            </label>
+            <label class="chip">
+                <input type="checkbox" name="format" value="overlay">
+                <span>Frame only</span>
+            </label>
+        </div>
+    </section>
+
+    <div class="toolbar">
+        <button type="button" class="text-btn" id="selectAllBtn">All</button>
+        <span class="sep">·</span>
+        <button type="button" class="text-btn" id="selectNoneBtn">None</button>
+        <span class="spacer"></span>
+        <span class="muted" id="selectedCount">0 selected</span>
+    </div>
+
+    <div id="grid" class="grid" role="list"></div>
+
+    <footer class="bottom">
+        <p id="status" class="status" role="status"></p>
+        <button type="button" class="primary" id="downloadBtn" disabled>Download selected</button>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
 </body>
 </html>

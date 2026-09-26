@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Disney Photo Pass Downloader",
-  "version": "1.1.0",
-  "description": "Download full-resolution Disney PhotoPass images (obqs1) from disneyphotopass.eu.",
+  "version": "1.2.3",
+  "description": "Select and download Disney PhotoPass photos (frame, photo only, or frame layer) from disneyphotopass.eu.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -18,11 +18,12 @@
   },
   "permissions": ["downloads"],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "web_accessible_resources": [
     {
-      "resources": ["pageScript.js"],
+      "resources": ["pageScript.js", "resolveOverlayScript.js"],
       "matches": [
         "https://www.disneyphotopass.eu/*",
         "https://disneyphotopass.eu/*"
